@@ -1,0 +1,6 @@
+[package]
+name = "asynclang"
+version = "0.1.0"
+authors = ["Oliver Maskery <omaskery@googlemail.com>"]
+
+[dependencies]
