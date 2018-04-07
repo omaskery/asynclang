@@ -1,5 +1,5 @@
 
-global task_to_wake: &Task;
+global timerx_continuation: Continuation;
 
 fn init() {
 }
@@ -7,13 +7,12 @@ fn init() {
 fn idle() {
 }
 
-task delay(task: &Task, period_ms: u32) {
+async delay(period_ms: u32) {
+    timerx_continuation = task_current().continuesWith;
     init_timerX(period_ms);
-    task_to_wake = task;
-    suspend;
 }
 
-task periodic(task: &Task, period_ms: u32) {
+async periodic(period_ms: u32) {
     loop {
         await delay(period_ms);
         await println("Hi!");
@@ -21,6 +20,6 @@ task periodic(task: &Task, period_ms: u32) {
 }
 
 interrupt timerx_overflow {
-    task_resume(task_to_wake);
+    await timerx_continuation;
 }
 
