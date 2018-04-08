@@ -1,6 +1,9 @@
 
 /target
 **/*.rs.bk
+
 *.swp
 *~
 
+.idea
+*.iml
