@@ -1,5 +1,5 @@
 
-mod ast;
+pub mod ast;
 
 use ast::{format::FormatAst, visitable::Visitable};
 
