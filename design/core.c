@@ -20,8 +20,8 @@ void Continuation_init(Continuation *this, TaskFn function, void *context) {
     this->context = context;
 }
 
-void Continuation_invoke(Continuation *this) {
-    this->function(this->context);
+void Continuation_invoke(Continuation this) {
+    this.function(this.context);
 }
 
 int main() {

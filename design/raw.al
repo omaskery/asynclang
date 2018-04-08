@@ -1,14 +1,12 @@
 
 global timerx_continuation: Continuation;
 
-fn init() {
-}
+fn init() {}
 
-fn idle() {
-}
+fn idle() {}
 
-async delay(period_ms: u32) {
-    timerx_continuation = task_current().continuesWith;
+fn delay(continuation: Continuation, period_ms: u32) {
+    timerx_continuation = continuation;
     init_timerX(period_ms);
 }
 
