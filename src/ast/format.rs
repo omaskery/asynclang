@@ -58,7 +58,7 @@ impl<'a> FormatAst<'a> {
         self.indented(|s| {
             for statement in statements {
                 s.accept_statement(&statement);
-                writeln!(s.writer);
+                writeln!(s.writer).unwrap();
             }
         });
 
@@ -212,6 +212,11 @@ impl<'a> VisitorMut<()> for FormatAst<'a> {
                     &TypeRef::Tuple { ref type_refs } => type_refs.is_empty(),
                     _ => false,
                 };
+
+                if is_none == false {
+                    write!(self.writer, " ->").unwrap();
+                    self.accept_type_ref(returns);
+                }
 
                 self.code_block("", body);
             }
