@@ -47,6 +47,27 @@ impl<'a> FormatAst<'a> {
             f(self, &item);
         }
     }
+
+    fn code_block(&mut self, prefix: &str, statements: &[Statement]) {
+        write!(self.writer, "{}{{", prefix).unwrap();
+
+        if statements.is_empty() == false {
+            writeln!(self.writer).unwrap();
+        }
+
+        self.indented(|s| {
+            for statement in statements {
+                s.accept_statement(&statement);
+                writeln!(s.writer);
+            }
+        });
+
+        if statements.is_empty() == false {
+            self.indent();
+        }
+
+        write!(self.writer, "}}").unwrap();
+    }
 }
 
 impl<'a> VisitorMut<()> for FormatAst<'a> {
@@ -149,37 +170,21 @@ impl<'a> VisitorMut<()> for FormatAst<'a> {
                     args,
                     |s, i| s.accept_expression(i),
                 );
-                writeln!(self.writer, ");").unwrap();
+                write!(self.writer, ");").unwrap();
             }
             &Statement::Assignment { ref target, ref expr } => {
                 self.accept_expression(&*target);
                 write!(self.writer, " = ").unwrap();
                 self.accept_expression(&*expr);
-                writeln!(self.writer, ";").unwrap();
+                write!(self.writer, ";").unwrap();
             }
             &Statement::Await(ref expr) => {
                 write!(self.writer, "await ").unwrap();
                 self.accept_expression(expr);
-                writeln!(self.writer, ";").unwrap();
+                write!(self.writer, ";").unwrap();
             }
             &Statement::Loop(ref statements) => {
-                write!(self.writer, "loop {{").unwrap();
-
-                if statements.is_empty() == false {
-                    writeln!(self.writer).unwrap();
-                }
-
-                self.indented(|s| {
-                    for statement in statements {
-                        s.accept_statement(&statement);
-                    }
-                });
-
-                if statements.is_empty() == false {
-                    self.indent();
-                }
-
-                writeln!(self.writer, "}}").unwrap();
+                self.code_block("loop ", statements);
             }
         }
     }
@@ -189,7 +194,6 @@ impl<'a> VisitorMut<()> for FormatAst<'a> {
             &TopLevelNode::GlobalDecl(ref vardecl) => {
                 write!(self.writer, "global ").unwrap();
                 self.accept_var_decl(vardecl);
-                writeln!(self.writer).unwrap();
             }
             &TopLevelNode::FnDecl { ref name, ref params, ref returns, ref body, async } => {
                 if async {
@@ -209,42 +213,12 @@ impl<'a> VisitorMut<()> for FormatAst<'a> {
                     _ => false,
                 };
 
-                if is_none {
-                    write!(self.writer, "{{").unwrap();
-                } else {
-                    self.accept_type_ref(&returns);
-                    write!(self.writer, " {{").unwrap();
-                }
-
-                if body.is_empty() == false {
-                    writeln!(self.writer).unwrap();
-                }
-
-                self.indented(|s| {
-                    for statement in body {
-                        s.accept_statement(&statement);
-                    }
-                });
-
-                writeln!(self.writer, "}}").unwrap();
+                self.code_block("", body);
             }
             &TopLevelNode::InterruptDecl { ref name, ref body } => {
-                write!(self.writer, "interrupt {} {{", name).unwrap();
-
-                if body.is_empty() == false {
-                    writeln!(self.writer).unwrap();
-                }
-
-                self.indented(|s| {
-                    for statement in body {
-                        s.accept_statement(&statement);
-                    }
-                });
-
-                writeln!(self.writer, "}}").unwrap();
+                self.code_block(&format!("interrupt {} ", name), body);
             }
         }
-        writeln!(self.writer).unwrap();
     }
 }
 
