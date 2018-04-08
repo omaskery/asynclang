@@ -27,7 +27,7 @@ fn main() {
 
         match result {
             Some((name, statements)) => {
-                let builder = cfg::Builder::new(&name);
+                let builder = cfg::builder::Builder::new(&name);
                 let mut cfg = builder.build(statements);
 
                 let filepath = format!("cfg_dotfiles/{}.dot", name);
