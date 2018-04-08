@@ -4,7 +4,18 @@ mod ast;
 use ast::{nodes::*, format::FormatAst, visitable::Visitable};
 
 fn main() {
-    let ast = vec![
+    let ast = build_test_ast();
+
+    let mut stdout = std::io::stdout();
+    let mut printer = FormatAst::new(&mut stdout);
+
+    for node in ast {
+        node.visit_mut(&mut printer);
+    }
+}
+
+fn build_test_ast() -> Vec<TopLevelNode> {
+     vec![
         TopLevelNode::GlobalDecl(VarDecl {
             name: "timerx_continuation".into(),
             type_ref: TypeRef::Named {
@@ -108,11 +119,5 @@ fn main() {
                 ),
             ],
         },
-    ];
-
-    let mut stdout = std::io::stdout();
-    let mut printer = FormatAst::new(&mut stdout);
-    for node in ast {
-        node.visit_mut(&mut printer);
-    }
+    ]
 }
