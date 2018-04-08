@@ -1,7 +1,7 @@
 
 mod ast;
 
-use ast::{nodes::*, format::FormatAst, visitable::Visitable};
+use ast::{format::FormatAst, visitable::Visitable};
 
 fn main() {
     let ast = build_test_ast();
@@ -14,7 +14,9 @@ fn main() {
     }
 }
 
-fn build_test_ast() -> Vec<TopLevelNode> {
+fn build_test_ast() -> Vec<ast::nodes::TopLevelNode> {
+    use ast::nodes::*;
+
      vec![
         TopLevelNode::GlobalDecl(VarDecl {
             name: "timerx_continuation".into(),
