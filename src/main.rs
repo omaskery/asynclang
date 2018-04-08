@@ -27,9 +27,13 @@ fn main() {
         match result {
             Some((name, statements)) => {
                 let builder = cfg::Builder::new(&name);
-                let cfg = builder.build(statements);
+                let mut cfg = builder.build(statements);
 
                 let filepath = format!("cfg_dotfiles/{}.dot", name);
+                cfg.to_dotfile(filepath).unwrap();
+
+                cfg.tidy_graph();
+                let filepath = format!("cfg_dotfiles/{}.tidy.dot", name);
                 cfg.to_dotfile(filepath).unwrap();
             },
             _ => {},
@@ -183,16 +187,25 @@ pub mod cfg {
         fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
             use ast::visitable::Visitable;
 
-            writeln!(f, "{}:", self.debug_name)?;
+            write!(f, "{}", self.debug_name)?;
+            if self.statements.len() > 0 {
+                writeln!(f, ":")?;
+            }
 
+            let mut first = true;
             for statement in self.statements.iter() {
+                if first == false {
+                    writeln!(f)?;
+                }
+                first = false;
+
                 let mut buffer = Vec::new();
                 {
                     let mut format = ast::format::FormatAst::with_indent(&mut buffer, 1);
                     statement.visit_mut(&mut format);
                 }
                 let buffer = String::from_utf8_lossy(&buffer);
-                writeln!(f, "{}", buffer)?;
+                write!(f, "{}", buffer)?;
             }
 
             Ok(())
@@ -213,6 +226,7 @@ pub mod cfg {
 
     pub struct ControlFlowGraph<'a> {
         entry_node: NodeIndex,
+        exit_node: Option<NodeIndex>,
         graph: GraphType<'a>,
     }
 
@@ -222,6 +236,44 @@ pub mod cfg {
 
             let mut file = File::create(filename)?;
             file.write_all(contents.as_bytes())
+        }
+
+        pub fn tidy_graph(&mut self) {
+            self.graph.retain_nodes(|g, idx| {
+                g.neighbors_undirected(idx).count() > 0
+            });
+
+            loop {
+                let mut removed_node = false;
+
+                let indicies = self.graph.node_indices().collect::<Vec<_>>();
+                for idx in indicies {
+                    let empty = self.graph[idx].statements.is_empty();
+
+                    if empty {
+                        let incoming = self.graph.neighbors_directed(idx, Direction::Incoming)
+                            .collect::<Vec<_>>();
+                        let outgoing = self.graph.neighbors_directed(idx, Direction::Outgoing)
+                            .collect::<Vec<_>>();
+
+                        if incoming.len() > 0 && outgoing.len() == 1 {
+                            let destination_idx = outgoing[0];
+                            for source_idx in incoming {
+                                let edge_idx = self.graph.find_edge(source_idx, idx).unwrap();
+                                let kind = self.graph[edge_idx];
+                                self.graph.add_edge(source_idx, destination_idx, kind);
+                            }
+                            self.graph.remove_node(idx);
+                            removed_node = true;
+                            break;
+                        }
+                    }
+                }
+
+                if removed_node == false {
+                    break;
+                }
+            }
         }
     }
 
@@ -272,10 +324,11 @@ pub mod cfg {
     impl<'a> Builder<'a> {
         pub fn new(name: &'a str) -> Self {
             let mut graph = GraphType::new();
-            let entry_node = graph.add_node(Block::with_name("entry node".into()));
+            let entry_node = graph.add_node(Block::with_name("function entry point".into()));
             Self {
                 result: ControlFlowGraph {
                     entry_node,
+                    exit_node: None,
                     graph,
                 },
                 block_counter: 0,
@@ -286,46 +339,12 @@ pub mod cfg {
         pub fn build(mut self, statements: &'a [ast::nodes::Statement]) -> ControlFlowGraph<'a> {
             let build_result = self.build_inner(statements);
             self.result.graph.add_edge(self.result.entry_node, build_result.start_block, Edge::Jump);
-            // self.tidy_graph();
-            self.result
-        }
-
-        fn tidy_graph(&mut self) {
-            self.result.graph.retain_nodes(|g, idx| {
-                g.neighbors(idx).count() > 0
-            });
-
-            loop {
-                let mut removed_node = false;
-
-                let indicies = self.result.graph.node_indices().collect::<Vec<_>>();
-                for idx in indicies {
-                    let empty = self.result.graph[idx].statements.is_empty();
-
-                    if empty {
-                        let incoming = self.result.graph.neighbors_directed(idx, Direction::Incoming)
-                            .collect::<Vec<_>>();
-                        let outgoing = self.result.graph.neighbors_directed(idx, Direction::Outgoing)
-                            .collect::<Vec<_>>();
-
-                        if incoming.len() > 0 && outgoing.len() == 1 {
-                            let destination_idx = outgoing[0];
-                            for source_idx in incoming {
-                                let edge_idx = self.result.graph.find_edge(source_idx, idx).unwrap();
-                                let kind = self.result.graph[edge_idx];
-                                self.result.graph.add_edge(source_idx, destination_idx, kind);
-                            }
-                            self.result.graph.remove_node(idx);
-                            removed_node = true;
-                            break;
-                        }
-                    }
-                }
-
-                if removed_node == false {
-                    break;
-                }
+            if self.result.graph.neighbors_directed(build_result.end_block, Direction::Outgoing).count() == 0 {
+                let exit_point = self.result.graph.add_node(Block::with_name("function exit point".into()));
+                self.result.exit_node = Some(exit_point.clone());
+                self.result.graph.add_edge(build_result.end_block, exit_point, Edge::Jump);
             }
+            self.result
         }
 
         fn build_inner(&mut self, statements: &'a [ast::nodes::Statement]) -> BuildResult {
@@ -388,7 +407,7 @@ pub mod cfg {
         }
 
         fn make_block_with_description(&mut self, description: &str) -> NodeIndex {
-            let name = format!("{}: {}", self.make_block_name(), description);
+            let name = format!("{} ({})", self.make_block_name(), description);
             self.result.graph.add_node(Block::with_name(name))
         }
 
