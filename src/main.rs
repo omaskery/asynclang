@@ -17,7 +17,7 @@ fn main() {
 fn build_test_ast() -> Vec<ast::nodes::TopLevelNode> {
     use ast::nodes::*;
 
-     vec![
+    vec![
         TopLevelNode::GlobalDecl(VarDecl {
             name: "timerx_continuation".into(),
             type_ref: TypeRef::Named {
